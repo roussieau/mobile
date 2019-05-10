@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
 /* These hold the broadcast and unicast structures, respectively. */
 static struct broadcast_conn broadcast;
 struct broadcast_msg {
@@ -16,6 +17,7 @@ struct broadcast_msg {
 struct node {
     int distToRoot;
     uint8_t addr[2];
+    unsigned long lastUpdate;
 };
 
 static struct node *parent;
@@ -23,6 +25,7 @@ static struct node *parent;
 /*---------------------------------------------------------------------------*/
 /* We first declare our two processes. */
 PROCESS(broadcast_process, "Broadcast process");
+//PROCESS(unicast_process, "Example unicast");
 
 /* The AUTOSTART_PROCESSES() definition specifices what processes to
    start when this module is loaded. We put both our processes
@@ -34,12 +37,22 @@ AUTOSTART_PROCESSES(&broadcast_process);
     static void
 broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
 {
+    if (parent->distToRoot == 0) return;
     struct broadcast_msg *msg;
     msg = packetbuf_dataptr();
-    if(parent->distToRoot < 0 || msg->dist < parent->distToRoot) {
+    if(parent->distToRoot == msg->dist 
+	&& parent->addr[0] == from->u8[0] 
+	&& parent->addr[1] == from->u8[1]) {
+	parent->lastUpdate = clock_seconds();
+    }
+ 	
+    if(parent->distToRoot < 0 
+       || msg->dist < parent->distToRoot
+       || clock_seconds() - parent->lastUpdate > 10) {
 	parent->distToRoot = msg->dist;
 	parent->addr[0] = from->u8[0];
 	parent->addr[1] = from->u8[1];
+	parent->lastUpdate = clock_seconds();
 	printf("New parent found:%d.%d dist:%d \n",
 	    from->u8[0], from->u8[1], msg->dist);
 
@@ -61,6 +74,7 @@ PROCESS_THREAD(broadcast_process, ev, data)
 
     parent = (struct node*)malloc(sizeof(struct node));
     parent->distToRoot = -1;
+    parent->lastUpdate = clock_seconds();
 
     broadcast_open(&broadcast, 129, &broadcast_call);
 
@@ -80,3 +94,38 @@ PROCESS_THREAD(broadcast_process, ev, data)
     PROCESS_END();
 }
 
+
+
+/******************************************************************************
+*UNICAST
+*/
+
+//static struct unicast_conn uc;
+/*---------------------------------------------------------------------------*/
+//PROCESS_THREAD(unicast_process, ev, data)
+//{
+//  PROCESS_EXITHANDLER(unicast_close(&uc);)
+//    
+//  PROCESS_BEGIN();
+//
+//  unicast_open(&uc, 146, &unicast_callbacks);
+//
+//  while(1) {
+//    static struct etimer et;
+//    linkaddr_t addr;
+//    
+//    etimer_set(&et, CLOCK_SECOND);
+//    
+//    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+//
+//    if (parent->distToRoot > 0) {
+//	packetbuf_copyfrom("Hello", 5);
+//	addr.u8[0] = parent->addr[0];
+//	addr.u8[1] = parent->addr[1];
+//	unicast_send(&uc, &addr);
+//    }
+//
+//  }
+//
+//  PROCESS_END();
+//}
