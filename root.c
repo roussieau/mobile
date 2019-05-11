@@ -4,6 +4,8 @@
 #include "lib/random.h"
 #include "net/rime/rime.h"
 
+#include "dev/serial-line.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -12,6 +14,7 @@
 struct broadcast_msg {
   uint8_t type;
   int16_t dist;
+  uint8_t conf;
 };
 struct runicast_msg {
   int8_t temperature;
@@ -29,7 +32,8 @@ static struct runicast_conn runicast;
 /*---------------------------------------------------------------------------*/
 PROCESS(broadcast_process, "Broadcast process");
 PROCESS(runicast_process, "Runicast process");
-AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
+PROCESS(main_process, "main process");
+AUTOSTART_PROCESSES(&broadcast_process, &runicast_process, &main_process);
 
 /*---------------------------------------------------------------------------*/
 static const struct broadcast_callbacks broadcast_call = {};
@@ -63,7 +67,7 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
   struct runicast_msg *msg;
   msg = packetbuf_dataptr();
 
-  printf("DATAS message received on ROOT: %d/temperature/%d#\n",
+  printf("%d/temperature/ %d\n",
   msg->src_ID, msg->temperature);
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
@@ -83,4 +87,22 @@ PROCESS_THREAD(runicast_process, ev, data) {
   }
 
   PROCESS_END();
+}
+
+PROCESS_THREAD(main_process, ev, data)
+{
+    PROCESS_BEGIN();
+    for(;;) {
+        PROCESS_WAIT_EVENT();
+        if (ev == serial_line_event_message && data != NULL) {
+            printf("got input string: '%s'\n", (const char *) data);
+            struct broadcast_msg msg;
+            msg.type = BROADCAST_TYPE_CONFIG;
+            msg.conf = 1;
+            packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+            broadcast_send(&broadcast);
+ 
+        }
+    }
+    PROCESS_END();
 }
