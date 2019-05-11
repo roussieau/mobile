@@ -111,7 +111,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
       PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
       if(parent->distToRoot >= 0) {
           // We know a path to the route
-          msg.dist = parent->distToRoot + 1
+          msg.dist = parent->distToRoot + 1;
           packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
           broadcast_send(&broadcast);
       }
@@ -125,31 +125,30 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 /*---------------------------UNICAST------------------------------------------*/
 static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
     // If root or not connected to parent, we do not forward packets
-    if(parent->distToRoot <= 0) return;
+    //if(parent->distToRoot <= 0) return;
 
 
     // When receiving a unicast packet, forward it to the parent
-    struct unicast_msg *msg;
-    linkaddr_t addr;
+    //struct unicast_msg *msg;
+    //linkaddr_t addr;
 
-    msg = packetbuf_dataptr();
-    addr.u8[0] = parent->addr[0];
-    addr.u8[1] = parent->addr[1];
+    //msg = packetbuf_dataptr();
+    //addr.u8[0] = parent->addr[0];
+    //addr.u8[1] = parent->addr[1];
 
-    packetbuf_copyfrom(msg, sizeof(struct unicast_message));
-    unicast_send(c, &addr);
+    //packetbuf_copyfrom(&msg, sizeof(struct unicast_message));
+    //unicast_send(c, &addr);
 }
 static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
 /*---------------------------------------------------------------------------*/
-// PROCESS_THREAD(unicast_process, ev, data)
-// {
-//  PROCESS_EXITHANDLER(unicast_close(&uc);)
-//
-//  PROCESS_BEGIN();
-//
-//  unicast_open(&uc, 146, &unicast_callbacks);
-//
-//  while(1) {
+PROCESS_THREAD(unicast_process, ev, data) {
+    PROCESS_EXITHANDLER(unicast_close(&unicast);)
+
+    PROCESS_BEGIN();
+
+    unicast_open(&unicast, 146, &unicast_callbacks);
+
+    while(1) {
 //    static struct etimer et;
 //    linkaddr_t addr;
 //
@@ -164,7 +163,7 @@ static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
 // 	unicast_send(&uc, &addr);
 //    }
 //
-//  }
-//
-//  PROCESS_END();
-// }
+    }
+
+    PROCESS_END();
+}
