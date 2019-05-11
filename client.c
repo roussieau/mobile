@@ -3,6 +3,7 @@
 #include "lib/memb.h"
 #include "lib/random.h"
 #include "net/rime/rime.h"
+#include "sys/timer.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -11,6 +12,7 @@
 /* These hold the broadcast and unicast structures, respectively. */
 static struct broadcast_conn broadcast;
 static struct unicast_conn unicast;
+static struct timer lastUpdate;
 
 struct broadcast_msg {
     uint8_t type;
@@ -28,7 +30,6 @@ enum {
 struct node {
     int distToRoot;
     uint8_t addr[2];
-    unsigned long lastUpdate;
 };
 
 static struct node *parent;
@@ -36,12 +37,12 @@ static struct node *parent;
 /*---------------------------------------------------------------------------*/
 /* We first declare our two processes. */
 PROCESS(broadcast_process, "Broadcast process");
-PROCESS(unicast_process, "Example unicast");
+//PROCESS(unicast_process, "Example unicast");
 
 /* The AUTOSTART_PROCESSES() definition specifices what processes to
    start when this module is loaded. We put both our processes
    there. */
-AUTOSTART_PROCESSES(&broadcast_process, &unicast_process);
+AUTOSTART_PROCESSES(&broadcast_process);
 
 /*---------------------------------------------------------------------------*/
 /* This function is called whenever a broadcast message is received. */
@@ -56,10 +57,10 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
         if(parent->distToRoot == msg->dist && parent->addr[0] == from->u8[0]
             && parent->addr[1] == from->u8[1]) {
               // Chosed parent is still up ==> update timestamp
-              parent->lastUpdate = clock_seconds();
+	    timer_restart(&lastUpdate);
         }
 
-        if(clock_seconds() - parent->lastUpdate > 10) {
+        if(timer_expired(&lastUpdate)) {
             // Chosed parent has timeout
             parent->distToRoot = -1;
         }
@@ -69,7 +70,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
             parent->distToRoot = msg->dist;
             parent->addr[0] = from->u8[0];
             parent->addr[1] = from->u8[1];
-            parent->lastUpdate = clock_seconds();
+	    timer_restart(&lastUpdate);
             printf("New parent found:%d.%d dist:%d \n",
                     from->u8[0], from->u8[1], msg->dist);
         }
@@ -78,10 +79,8 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
                 && from->u8[1] == parent->addr[1]) {
         // CONFIG MESSAGE only allowed from parent IF we have one
         // CONFIG MESSAGE ==> We need to forward it downstream
-        printf("CONFIG message received from:%d.%d\n", from->u8[0], from->u8[1]);
+        printf("CONFIG message received from parent\n");
 
-        struct broadcast_msg *msg;
-        msg = packetbuf_dataptr();
         packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
     }
@@ -102,7 +101,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 
     parent = (struct node*)malloc(sizeof(struct node));
     parent->distToRoot = -1;
-    parent->lastUpdate = clock_seconds();
+    timer_set(&lastUpdate, CLOCK_SECOND * 40);
 
     broadcast_open(&broadcast, 129, &broadcast_call);
 
@@ -118,7 +117,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
           broadcast_send(&broadcast);
       }
 
-      if(random_rand() % 50 == 0) {
+      if(random_rand() % 1000 == 0 && parent->distToRoot == 0) {
         struct broadcast_msg config;
         config.type = BROADCAST_TYPE_CONFIG;
         packetbuf_copyfrom(&config, sizeof(struct broadcast_msg));
@@ -131,48 +130,49 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 
 
 
-/*---------------------------UNICAST------------------------------------------*/
-static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
-    // If root or not connected to parent, we do not forward packets
-    //if(parent->distToRoot <= 0) return;
-
-
-    // When receiving a unicast packet, forward it to the parent
-    //struct unicast_msg *msg;
-    //linkaddr_t addr;
-
-    //msg = packetbuf_dataptr();
-    //addr.u8[0] = parent->addr[0];
-    //addr.u8[1] = parent->addr[1];
-
-    //packetbuf_copyfrom(&msg, sizeof(struct unicast_message));
-    //unicast_send(c, &addr);
-}
-static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
-/*---------------------------------------------------------------------------*/
-PROCESS_THREAD(unicast_process, ev, data) {
-    PROCESS_EXITHANDLER(unicast_close(&unicast);)
-
-    PROCESS_BEGIN();
-
-    unicast_open(&unicast, 146, &unicast_callbacks);
-
-    while(1) {
-//    static struct etimer et;
-//    linkaddr_t addr;
+///*---------------------------UNICAST------------------------------------------*/
+//static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
+//    printf("unicast: packet received !\n");
+//    // If root or not connected to parent, we do not forward packets
+//    //if(parent->distToRoot <= 0) return;
 //
-//    etimer_set(&et, CLOCK_SECOND);
 //
-//    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+//    // When receiving a unicast packet, forward it to the parent
+//    //struct unicast_msg *msg;
+//    //linkaddr_t addr;
 //
-//    if (parent->distToRoot > 0) {
-// 	packetbuf_copyfrom("Hello", 5);
-// 	addr.u8[0] = parent->addr[0];
-// 	addr.u8[1] = parent->addr[1];
-// 	unicast_send(&uc, &addr);
+//    //msg = packetbuf_dataptr();
+//    //addr.u8[0] = parent->addr[0];
+//    //addr.u8[1] = parent->addr[1];
+//
+//    //packetbuf_copyfrom(&msg, sizeof(struct unicast_message));
+//    //unicast_send(c, &addr);
+//}
+//static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
+///*---------------------------------------------------------------------------*/
+//PROCESS_THREAD(unicast_process, ev, data) {
+//    PROCESS_EXITHANDLER(unicast_close(&unicast);)
+//
+//    PROCESS_BEGIN();
+//
+//    unicast_open(&unicast, 146, &unicast_callbacks);
+//
+//    while(1) {
+////    static struct etimer et;
+////    linkaddr_t addr;
+////
+////    etimer_set(&et, CLOCK_SECOND);
+////
+////    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+////
+////    if (parent->distToRoot > 0) {
+//// 	packetbuf_copyfrom("Hello", 5);
+//// 	addr.u8[0] = parent->addr[0];
+//// 	addr.u8[1] = parent->addr[1];
+//// 	unicast_send(&uc, &addr);
+////    }
+////
 //    }
 //
-    }
-
-    PROCESS_END();
-}
+//    PROCESS_END();
+//}
