@@ -19,7 +19,7 @@ struct broadcast_msg {
     int dist;
 };
 struct unicast_msg {
-    // some datas
+    int temperature;
 };
 /* These are the types of broadcast messages that we can send. */
 enum {
@@ -37,12 +37,12 @@ static struct node *parent;
 /*---------------------------------------------------------------------------*/
 /* We first declare our two processes. */
 PROCESS(broadcast_process, "Broadcast process");
-//PROCESS(unicast_process, "Example unicast");
+PROCESS(unicast_process, "Unicast process");
 
 /* The AUTOSTART_PROCESSES() definition specifices what processes to
    start when this module is loaded. We put both our processes
    there. */
-AUTOSTART_PROCESSES(&broadcast_process);
+AUTOSTART_PROCESSES(&broadcast_process, &unicast_process);
 
 /*---------------------------------------------------------------------------*/
 /* This function is called whenever a broadcast message is received. */
@@ -118,7 +118,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
       }
 
       if(random_rand() % 1000 == 0 && parent->distToRoot == 0) {
-        struct broadcast_msg config;
+       struct broadcast_msg config;
         config.type = BROADCAST_TYPE_CONFIG;
         packetbuf_copyfrom(&config, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
@@ -130,49 +130,52 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 
 
 
-///*---------------------------UNICAST------------------------------------------*/
-//static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
-//    printf("unicast: packet received !\n");
-//    // If root or not connected to parent, we do not forward packets
-//    //if(parent->distToRoot <= 0) return;
-//
-//
-//    // When receiving a unicast packet, forward it to the parent
-//    //struct unicast_msg *msg;
-//    //linkaddr_t addr;
-//
-//    //msg = packetbuf_dataptr();
-//    //addr.u8[0] = parent->addr[0];
-//    //addr.u8[1] = parent->addr[1];
-//
-//    //packetbuf_copyfrom(&msg, sizeof(struct unicast_message));
-//    //unicast_send(c, &addr);
-//}
-//static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
-///*---------------------------------------------------------------------------*/
-//PROCESS_THREAD(unicast_process, ev, data) {
-//    PROCESS_EXITHANDLER(unicast_close(&unicast);)
-//
-//    PROCESS_BEGIN();
-//
-//    unicast_open(&unicast, 146, &unicast_callbacks);
-//
-//    while(1) {
-////    static struct etimer et;
-////    linkaddr_t addr;
-////
-////    etimer_set(&et, CLOCK_SECOND);
-////
-////    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-////
-////    if (parent->distToRoot > 0) {
-//// 	packetbuf_copyfrom("Hello", 5);
-//// 	addr.u8[0] = parent->addr[0];
-//// 	addr.u8[1] = parent->addr[1];
-//// 	unicast_send(&uc, &addr);
-////    }
-////
-//    }
-//
-//    PROCESS_END();
-//}
+/*---------------------------UNICAST------------------------------------------*/
+static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
+    // If root or not connected to parent, we do not forward packets
+    if(parent->distToRoot <= 0) return;
+
+
+    // When receiving a unicast packet, forward it to the parent
+    struct unicast_msg *msg;
+    linkaddr_t addr;
+
+    msg = packetbuf_dataptr();
+    addr.u8[0] = parent->addr[0];
+    addr.u8[1] = parent->addr[1];
+
+    printf("DATAS message received from children (%d)\n", msg->temperature);
+
+    packetbuf_copyfrom(msg, sizeof(struct unicast_msg));
+    unicast_send(c, &addr);
+}
+static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(unicast_process, ev, data) {
+    struct unicast_msg msg;
+    msg.temperature = random_rand() % 1000;
+
+    PROCESS_EXITHANDLER(unicast_close(&unicast);)
+
+    PROCESS_BEGIN();
+
+    unicast_open(&unicast, 146, &unicast_callbacks);
+
+    while(1) {
+        static struct etimer et;
+        linkaddr_t addr;
+
+        etimer_set(&et, CLOCK_SECOND * 16 + random_rand() % (CLOCK_SECOND * 16));
+
+        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+
+        if(parent->distToRoot > 0) {
+            packetbuf_copyfrom(&msg, sizeof(struct unicast_msg));
+            addr.u8[0] = parent->addr[0];
+            addr.u8[1] = parent->addr[1];
+            unicast_send(&unicast, &addr);
+        }
+    }
+
+    PROCESS_END();
+}
