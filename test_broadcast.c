@@ -78,6 +78,8 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
                 && from->u8[1] == parent->addr[1]) {
         // CONFIG MESSAGE only allowed from parent IF we have one
         // CONFIG MESSAGE ==> We need to forward it downstream
+        printf("CONFIG message received from:%d.%d\n", from->u8[0], from->u8[1]);
+
         struct broadcast_msg *msg;
         msg = packetbuf_dataptr();
         packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
@@ -114,6 +116,13 @@ PROCESS_THREAD(broadcast_process, ev, data) {
           msg.dist = parent->distToRoot + 1;
           packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
           broadcast_send(&broadcast);
+      }
+
+      if(random_rand() % 50 == 0) {
+        struct broadcast_msg config;
+        config.type = BROADCAST_TYPE_CONFIG;
+        packetbuf_copyfrom(&config, sizeof(struct broadcast_msg));
+        broadcast_send(&broadcast);
       }
     }
 
