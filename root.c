@@ -64,14 +64,12 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
   msg = packetbuf_dataptr();
 
   printf("DATAS message received on ROOT: %d/temperature/%d#\n",
-  msg->src_ID, msg->temperature)
+  msg->src_ID, msg->temperature);
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
   static struct etimer et;
-  struct runicast_msg msg;
-  msg.src_ID = node_id;
 
   PROCESS_EXITHANDLER(runicast_close(&runicast);)
   PROCESS_BEGIN();
