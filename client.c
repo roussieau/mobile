@@ -1,4 +1,5 @@
 #include "contiki.h"
+#include "node-id.h"
 #include "lib/list.h"
 #include "lib/memb.h"
 #include "lib/random.h"
@@ -18,11 +19,11 @@ static struct timer lastUpdate;
 
 struct broadcast_msg {
     uint8_t type;
-    int dist;
+    int16_t dist;
 };
 struct runicast_msg {
     int8_t temperature;
-    uint8_t src_addr[2];
+    uint8_t src_ID;
 };
 /* These are the types of broadcast messages that we can send. */
 enum {
@@ -147,7 +148,8 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
     addr.u8[0] = parent->addr[0];
     addr.u8[1] = parent->addr[1];
 
-    printf("DATAS message received from children (%d)\n", msg->temperature);
+    printf("DATAS message received from children %d/temperature/%d#\n",
+		msg->src_ID, msg->temperature);
 
     packetbuf_copyfrom(msg, sizeof(struct runicast_msg));
     runicast_send(c, &addr, MAX_RETRANSMISSIONS);
@@ -156,8 +158,7 @@ static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
     struct runicast_msg msg;
-    msg.src_addr[0] = linkaddr_node_addr.u8[0];
-    msg.src_addr[1] = linkaddr_node_addr.u8[1];
+    msg.src_ID = node_id;
 
     PROCESS_EXITHANDLER(runicast_close(&runicast);)
 
@@ -169,6 +170,7 @@ PROCESS_THREAD(runicast_process, ev, data) {
         static struct etimer et;
         linkaddr_t addr;
 
+        // Delay between 16 and 32 seconds
         etimer_set(&et, CLOCK_SECOND * 16 + random_rand() % (CLOCK_SECOND * 16));
 
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
