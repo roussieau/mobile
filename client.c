@@ -21,7 +21,8 @@ struct broadcast_msg {
     int dist;
 };
 struct runicast_msg {
-    int temperature;
+    int8_t temperature;
+    uint8_t src_addr[2];
 };
 /* These are the types of broadcast messages that we can send. */
 enum {
@@ -155,7 +156,8 @@ static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
     struct runicast_msg msg;
-    msg.temperature = random_rand() % 1000;
+    msg.src_addr[0] = linkaddr_node_addr.u8[0];
+    msg.src_addr[1] = linkaddr_node_addr.u8[1];
 
     PROCESS_EXITHANDLER(runicast_close(&runicast);)
 
@@ -172,6 +174,7 @@ PROCESS_THREAD(runicast_process, ev, data) {
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
         if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
+            msg.temperature = (random_rand() % 40) - 10;
             packetbuf_copyfrom(&msg, sizeof(struct runicast_msg));
             addr.u8[0] = parent->addr[0];
             addr.u8[1] = parent->addr[1];
