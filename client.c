@@ -81,7 +81,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
         // CONFIG MESSAGE ==> We need to forward it downstream
         printf("CONFIG message received from parent\n");
 
-        packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+        packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
     }
 }
