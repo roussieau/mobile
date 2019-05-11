@@ -32,7 +32,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
   static struct etimer et;
   struct broadcast_msg msg;
   msg.type = BROADCAST_TYPE_DISCOVER;
-  msg.dist = 0;
+  msg.dist = 1;
 
   PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
   PROCESS_BEGIN();
