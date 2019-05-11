@@ -8,17 +8,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MAX_RETRANSMISSIONS 4
 
-/* These hold the broadcast and unicast structures, respectively. */
+
+/* These hold the broadcast and runicast structures, respectively. */
 static struct broadcast_conn broadcast;
-static struct unicast_conn unicast;
+static struct runicast_conn runicast;
 static struct timer lastUpdate;
 
 struct broadcast_msg {
     uint8_t type;
     int dist;
 };
-struct unicast_msg {
+struct runicast_msg {
     int temperature;
 };
 /* These are the types of broadcast messages that we can send. */
@@ -37,12 +39,12 @@ static struct node *parent;
 /*---------------------------------------------------------------------------*/
 /* We first declare our two processes. */
 PROCESS(broadcast_process, "Broadcast process");
-PROCESS(unicast_process, "Unicast process");
+PROCESS(runicast_process, "Runicast process");
 
 /* The AUTOSTART_PROCESSES() definition specifices what processes to
    start when this module is loaded. We put both our processes
    there. */
-AUTOSTART_PROCESSES(&broadcast_process, &unicast_process);
+AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
 
 /*---------------------------------------------------------------------------*/
 /* This function is called whenever a broadcast message is received. */
@@ -130,14 +132,14 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 
 
 
-/*---------------------------UNICAST------------------------------------------*/
-static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
+/*---------------------------RUNICAST-----------------------------------------*/
+static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
     // If root or not connected to parent, we do not forward packets
     if(parent->distToRoot <= 0) return;
 
 
-    // When receiving a unicast packet, forward it to the parent
-    struct unicast_msg *msg;
+    // When receiving a runicast packet, forward it to the parent
+    struct runicast_msg *msg;
     linkaddr_t addr;
 
     msg = packetbuf_dataptr();
@@ -146,20 +148,20 @@ static void unicast_recv(struct unicast_conn *c, const linkaddr_t *from) {
 
     printf("DATAS message received from children (%d)\n", msg->temperature);
 
-    packetbuf_copyfrom(msg, sizeof(struct unicast_msg));
-    unicast_send(c, &addr);
+    packetbuf_copyfrom(msg, sizeof(struct runicast_msg));
+    runicast_send(c, &addr, MAX_RETRANSMISSIONS);
 }
-static const struct unicast_callbacks unicast_callbacks = {unicast_recv};
+static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(unicast_process, ev, data) {
-    struct unicast_msg msg;
+    struct runicast_msg msg;
     msg.temperature = random_rand() % 1000;
 
     PROCESS_EXITHANDLER(unicast_close(&unicast);)
 
     PROCESS_BEGIN();
 
-    unicast_open(&unicast, 146, &unicast_callbacks);
+    runicast_open(&unicast, 144, &unicast_callbacks);
 
     while(1) {
         static struct etimer et;
@@ -169,11 +171,11 @@ PROCESS_THREAD(unicast_process, ev, data) {
 
         PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
 
-        if(parent->distToRoot > 0) {
-            packetbuf_copyfrom(&msg, sizeof(struct unicast_msg));
+        if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
+            packetbuf_copyfrom(&msg, sizeof(struct runicast_msg));
             addr.u8[0] = parent->addr[0];
             addr.u8[1] = parent->addr[1];
-            unicast_send(&unicast, &addr);
+            runicast_send(&unicast, &addr, MAX_RETRANSMISSIONS);
         }
     }
 
