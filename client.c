@@ -153,15 +153,15 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
-PROCESS_THREAD(unicast_process, ev, data) {
+PROCESS_THREAD(runicast_process, ev, data) {
     struct runicast_msg msg;
     msg.temperature = random_rand() % 1000;
 
-    PROCESS_EXITHANDLER(unicast_close(&unicast);)
+    PROCESS_EXITHANDLER(runicast_close(&runicast);)
 
     PROCESS_BEGIN();
 
-    runicast_open(&unicast, 144, &unicast_callbacks);
+    runicast_open(&runicast, 144, &runicast_callbacks);
 
     while(1) {
         static struct etimer et;
@@ -175,7 +175,7 @@ PROCESS_THREAD(unicast_process, ev, data) {
             packetbuf_copyfrom(&msg, sizeof(struct runicast_msg));
             addr.u8[0] = parent->addr[0];
             addr.u8[1] = parent->addr[1];
-            runicast_send(&unicast, &addr, MAX_RETRANSMISSIONS);
+            runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
         }
     }
 
