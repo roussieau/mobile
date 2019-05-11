@@ -102,7 +102,10 @@ PROCESS_THREAD(broadcast_process, ev, data) {
     etimer_set(&et, CLOCK_SECOND * 4 + random_rand() % (CLOCK_SECOND * 4));
 
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-    if(parent->distToRoot > 0) {
+    if(parent->distToRoot > 0 && timer_expired(&lastUpdate)) {
+      parent->distToRoot = -1;
+      printf("Timer expired\n");
+    } else if(parent->distToRoot > 0) {
       // We know a path to the route
       msg.dist = parent->distToRoot + 1;
       packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
