@@ -13,8 +13,10 @@ def on_message(client, userdata, message):
 if __name__ == "__main__":
     print("MQTT subscriber")
 
-    client = mqtt.Client("broker")
+    client = mqtt.Client()
     client.connect(BROKER_ADDRESS)
     client.subscribe("3/temperature/")
+    client.subscribe("4/temperature/")
+    client.subscribe("1/temperature/")
     client.on_message = on_message
     client.loop_forever()
