@@ -8,25 +8,18 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include "message.h"
 
 #define MAX_RETRANSMISSIONS 4
 
-
-
-struct broadcast_msg {
-  uint8_t type;
-  int16_t dist;
-};
-/* These are the types of broadcast messages that we can send. */
-enum {
-  BROADCAST_TYPE_DISCOVER,
-  BROADCAST_TYPE_CONFIG
+struct runicast_msg {
+    int8_t temperature;
+    uint8_t src_ID;
 };
 
 struct node {
-  int16_t distToRoot;
-  uint8_t addr[2];
+    int16_t distToRoot;
+    uint8_t addr[2];
 };
 
 
@@ -44,73 +37,88 @@ AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
 
 /*---------------------------------------------------------------------------*/
 static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
-  struct broadcast_msg *msg;
-  msg = packetbuf_dataptr();
+    struct broadcast_msg *msg;
+    msg = packetbuf_dataptr();
+    // Discover packet 
+    if(msg->type == BROADCAST_TYPE_DISCOVER) {
+        // DISCOVER MESSAGE ==> We need to construct the tree
+        if(parent->distToRoot == msg->info && parent->addr[0] == from->u8[0]
+                && parent->addr[1] == from->u8[1]) {
+            // Chosed parent is still up ==> restart timer
+            timer_restart(&lastUpdate);
+        }
 
-  if(msg->type == BROADCAST_TYPE_DISCOVER) {
-    // DISCOVER MESSAGE ==> We need to construct the tree
-    if(parent->distToRoot == msg->dist && parent->addr[0] == from->u8[0]
-      && parent->addr[1] == from->u8[1]) {
-      // Chosed parent is still up ==> restart timer
-      timer_restart(&lastUpdate);
+        if(timer_expired(&lastUpdate)) {
+            // Chosed parent has timeout
+            parent->distToRoot = -1;
+        }
+
+        if(parent->distToRoot < 0 || msg->info < parent->distToRoot) {
+            // We have no parent OR we found a better one
+            parent->distToRoot = msg->info;
+            parent->addr[0] = from->u8[0];
+            parent->addr[1] = from->u8[1];
+            timer_restart(&lastUpdate);
+            printf("New parent found:%d.%d dist:%d \n",
+                    from->u8[0], from->u8[1], msg->info);
+        }
     }
-
-    if(timer_expired(&lastUpdate)) {
-      // Chosed parent has timeout
-      parent->distToRoot = -1;
+    else if (msg-> type == BROADCAST_TYPE_SIGNALLOST 
+            && from->u8[0] == parent->addr[0]
+            && from->u8[1] == parent->addr[1]) {
+        // Signal to root is lost
+        printf("Lost signal received !\n");
+        parent->distToRoot = -1;
+        packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
+        broadcast_send(&broadcast);
     }
+    else if (msg->type == BROADCAST_TYPE_CONFIG 
+            && from->u8[0] == parent->addr[0]
+            && from->u8[1] == parent->addr[1]) {
+        // CONFIG MESSAGE only allowed from parent IF we have one
+        // CONFIG MESSAGE ==> We need to forward it downstream
+        printf("CONFIG message received from parent\n");
 
-    if(parent->distToRoot < 0 || msg->dist < parent->distToRoot) {
-      // We have no parent OR we found a better one
-      parent->distToRoot = msg->dist;
-      parent->addr[0] = from->u8[0];
-      parent->addr[1] = from->u8[1];
-      timer_restart(&lastUpdate);
-      printf("New parent found:%d.%d dist:%d \n",
-              from->u8[0], from->u8[1], msg->dist);
+        packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
+        broadcast_send(&broadcast);
     }
-  } else if(msg->type == BROADCAST_TYPE_CONFIG && parent->distToRoot >= 0
-              && from->u8[0] == parent->addr[0]
-              && from->u8[1] == parent->addr[1]) {
-    // CONFIG MESSAGE only allowed from parent IF we have one
-    // CONFIG MESSAGE ==> We need to forward it downstream
-    printf("CONFIG message received from parent\n");
-
-    packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
-    broadcast_send(&broadcast);
-  }
 }
 static const struct broadcast_callbacks broadcast_call = {broadcast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(broadcast_process, ev, data) {
-  static struct etimer et;
-  struct broadcast_msg msg;
-  msg.type = BROADCAST_TYPE_DISCOVER;
+    static struct etimer et;
+    struct broadcast_msg msg;
 
-  PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
-  PROCESS_BEGIN();
+    PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
+        PROCESS_BEGIN();
 
-  parent = (struct node*)malloc(sizeof(struct node));
-  parent->distToRoot = -1;
-  timer_set(&lastUpdate, CLOCK_SECOND * 40);
+    parent = (struct node*)malloc(sizeof(struct node));
+    parent->distToRoot = -1;
+    timer_set(&lastUpdate, CLOCK_SECOND * 40);
 
-  broadcast_open(&broadcast, 129, &broadcast_call);
+    broadcast_open(&broadcast, 129, &broadcast_call);
 
-  while(1) {
-    /* Send a broadcast every 16 - 32 seconds */
-    etimer_set(&et, CLOCK_SECOND * 4 + random_rand() % (CLOCK_SECOND * 4));
+    while(1) {
+        /* Send a broadcast every 16 - 32 seconds */
+        etimer_set(&et, CLOCK_SECOND * 4 + random_rand() % (CLOCK_SECOND * 4));
 
-    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-    if(parent->distToRoot > 0 && timer_expired(&lastUpdate)) {
-      parent->distToRoot = -1;
-      printf("Timer expired\n");
-    } else if(parent->distToRoot > 0) {
-      // We know a path to the route
-      msg.dist = parent->distToRoot + 1;
-      packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
-      broadcast_send(&broadcast);
+        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+        if(parent->distToRoot > 0 && timer_expired(&lastUpdate)) {
+            parent->distToRoot = -1;
+            printf("Timer expired\n");
+            // We warn the neighbors that we have lost the signal to root
+            msg.type = BROADCAST_TYPE_SIGNALLOST;
+            packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));  
+            broadcast_send(&broadcast);
+        }
+        else if(parent->distToRoot > 0) {
+            // We know a path to the route
+            msg.type = BROADCAST_TYPE_DISCOVER;
+            msg.info = parent->distToRoot + 1;
+            packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+            broadcast_send(&broadcast);
+        }
     }
-  }
 
   free(parent);
   PROCESS_END();
@@ -132,8 +140,8 @@ static void runicast_send_bulk(struct runicast_conn *c) {
   }
 }
 static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
-  // If root or not connected to parent, we do not forward packets
-  if(parent->distToRoot < 0) return;
+    // If root or not connected to parent, we do not forward packets
+    if(parent->distToRoot < 0) return;
 
   // When receiving a runicast packet, forward it to the parent
   char *datas;
@@ -151,6 +159,7 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
 }
 static const struct runicast_callbacks test = {};
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
+
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
   char datas[25];
@@ -176,8 +185,8 @@ PROCESS_THREAD(runicast_process, ev, data) {
       addr.u8[1] = parent->addr[1];
       runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
     }
-  }
 
-  PROCESS_END();
+  }
+    PROCESS_END();
 }
 

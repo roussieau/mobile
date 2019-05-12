@@ -24,7 +24,7 @@ def establish(device_name) :
 
 
     def send_to_mqtt(data) :
-        s = data.split(" ")
+        s = data.split(":")
         client.publish(s[0], s[1])
 
     def on_message(client, userdata, message) :
