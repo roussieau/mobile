@@ -16,10 +16,6 @@ struct broadcast_msg {
   int16_t dist;
   uint8_t conf;
 };
-struct runicast_msg {
-  int8_t temperature;
-  uint8_t src_ID;
-};
 /* These are the types of broadcast messages that we can send. */
 enum {
   BROADCAST_TYPE_DISCOVER,
@@ -64,11 +60,10 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 
 /*---------------------------RUNICAST-----------------------------------------*/
 static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
-  struct runicast_msg *msg;
-  msg = packetbuf_dataptr();
+  char *datas;
+  datas = packetbuf_dataptr();
 
-  printf("%d/temperature/ %d\n",
-  msg->src_ID, msg->temperature);
+  printf("%s\n", datas);
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/

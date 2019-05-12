@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define MAX_RETRANSMISSIONS 4
 
@@ -16,10 +17,6 @@
 struct broadcast_msg {
   uint8_t type;
   int16_t dist;
-};
-struct runicast_msg {
-  int8_t temperature;
-  uint8_t src_ID;
 };
 /* These are the types of broadcast messages that we can send. */
 enum {
@@ -124,21 +121,20 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
   if(parent->distToRoot < 0) return;
 
   // When receiving a runicast packet, forward it to the parent
-  struct runicast_msg *msg;
+  char *datas;
   linkaddr_t addr;
 
-  msg = packetbuf_dataptr();
+  datas = packetbuf_dataptr();
   addr.u8[0] = parent->addr[0];
   addr.u8[1] = parent->addr[1];
 
-  packetbuf_copyfrom(msg, sizeof(struct runicast_msg));
+  packetbuf_copyfrom(datas, strlen(datas));
   runicast_send(c, &addr, MAX_RETRANSMISSIONS);
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
-  struct runicast_msg msg;
-  msg.src_ID = node_id;
+  char *datas = (char *)malloc(20);
 
   PROCESS_EXITHANDLER(runicast_close(&runicast);)
   PROCESS_BEGIN();
@@ -153,8 +149,9 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
-      msg.temperature = (random_rand() % 40) - 10;
-      packetbuf_copyfrom(&msg, sizeof(struct runicast_msg));
+      memset(datas, ' ', 20);
+      sprintf(datas, "%d/temperature/%d", node_id, (random_rand() % 40) - 10);
+      packetbuf_copyfrom(datas, strlen(datas));
       addr.u8[0] = parent->addr[0];
       addr.u8[1] = parent->addr[1];
       runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
