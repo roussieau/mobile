@@ -8,6 +8,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "stdbool.h"
 
 
 
@@ -24,6 +26,7 @@ enum {
 
 static struct broadcast_conn broadcast;
 static struct runicast_conn runicast;
+static bool powerOn = 1;
 
 /*---------------------------------------------------------------------------*/
 PROCESS(broadcast_process, "Broadcast process");
@@ -47,10 +50,12 @@ PROCESS_THREAD(broadcast_process, ev, data) {
   while(1) {
     /* Send a broadcast every 4 - 8 seconds */
     etimer_set(&et, CLOCK_SECOND * 4 + random_rand() % (CLOCK_SECOND * 4));
-
+    
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-    packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
-    broadcast_send(&broadcast);
+    if(powerOn) {
+        packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+        broadcast_send(&broadcast);
+    }
   }
 
   PROCESS_END();
@@ -91,11 +96,21 @@ PROCESS_THREAD(main_process, ev, data)
         PROCESS_WAIT_EVENT();
         if (ev == serial_line_event_message && data != NULL) {
             printf("got input string: '%s'\n", (const char *) data);
-            struct broadcast_msg msg;
-            msg.type = BROADCAST_TYPE_CONFIG;
-            msg.conf = 1;
-            packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
-            broadcast_send(&broadcast);
+            if (strcmp("power on", data) == 0) {
+                powerOn = 1;
+                printf("Power on !\n");
+            }
+            else if (strcmp("power off", data) == 0) {
+                powerOn = 0;
+                printf("Power off !\n");
+            }
+            else { 
+                struct broadcast_msg msg;
+                msg.type = BROADCAST_TYPE_CONFIG;
+                msg.conf = 1;
+                packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+                broadcast_send(&broadcast);
+            }
  
         }
     }
