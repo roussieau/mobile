@@ -10,24 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stdbool.h"
-
-
-
-struct broadcast_msg {
-  uint8_t type;
-  int16_t dist;
-  uint8_t conf;
-};
+#include "message.h"
 
 struct runicast_msg {
   int8_t temperature;
   uint8_t src_ID;
-};
-
-/* These are the types of broadcast messages that we can send. */
-enum {
-  BROADCAST_TYPE_DISCOVER,
-  BROADCAST_TYPE_CONFIG
 };
 
 static struct broadcast_conn broadcast;
@@ -47,7 +34,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
   static struct etimer et;
   struct broadcast_msg msg;
   msg.type = BROADCAST_TYPE_DISCOVER;
-  msg.dist = 1;
+  msg.info = 1;
 
   PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
   PROCESS_BEGIN();
@@ -99,6 +86,7 @@ PROCESS_THREAD(runicast_process, ev, data) {
 PROCESS_THREAD(main_process, ev, data)
 {
     PROCESS_BEGIN();
+	struct broadcast_msg msg;
     for(;;) {
         PROCESS_WAIT_EVENT();
         if (ev == serial_line_event_message && data != NULL) {
@@ -110,11 +98,13 @@ PROCESS_THREAD(main_process, ev, data)
             else if (strcmp("power off", data) == 0) {
                 powerOn = 0;
                 printf("Power off !\n");
-            }
+				msg.type = BROADCAST_TYPE_SIGNALLOST;
+                packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+                broadcast_send(&broadcast);
+       }
             else { 
-                struct broadcast_msg msg;
                 msg.type = BROADCAST_TYPE_CONFIG;
-                msg.conf = 1;
+                msg.info = 1;
                 packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
                 broadcast_send(&broadcast);
             }
