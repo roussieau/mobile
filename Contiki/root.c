@@ -58,11 +58,10 @@ PROCESS_THREAD(broadcast_process, ev, data) {
 
 /*---------------------------RUNICAST-----------------------------------------*/
 static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
-  struct runicast_msg *msg;
-  msg = packetbuf_dataptr();
+  char *datas;
+  datas = packetbuf_dataptr();
 
-  printf("%d/temperature/ %d\n",
-  msg->src_ID, msg->temperature);
+  printf("%s\n", datas);
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/

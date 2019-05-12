@@ -65,7 +65,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // Signal to root is lost
-        printf("Lost signal received !n\n");
+        printf("Lost signal received !\n");
         parent->distToRoot = -1;
         packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
@@ -128,45 +128,45 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
     // If root or not connected to parent, we do not forward packets
     if(parent->distToRoot < 0) return;
 
-    // When receiving a runicast packet, forward it to the parent
-    struct runicast_msg *msg;
-    linkaddr_t addr;
+  // When receiving a runicast packet, forward it to the parent
+  char *datas;
+  linkaddr_t addr;
 
-    msg = packetbuf_dataptr();
-    addr.u8[0] = parent->addr[0];
-    addr.u8[1] = parent->addr[1];
+  datas = packetbuf_dataptr();
+  addr.u8[0] = parent->addr[0];
+  addr.u8[1] = parent->addr[1];
 
-    packetbuf_copyfrom(msg, sizeof(struct runicast_msg));
-    runicast_send(c, &addr, MAX_RETRANSMISSIONS);
+  packetbuf_copyfrom(datas, strlen(datas));
+  runicast_send(c, &addr, MAX_RETRANSMISSIONS);
 }
 
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
-    struct runicast_msg msg;
-    msg.src_ID = node_id;
+  char *datas = (char *)malloc(20);
 
-    PROCESS_EXITHANDLER(runicast_close(&runicast);)
-        PROCESS_BEGIN();
-    runicast_open(&runicast, 144, &runicast_callbacks);
+  PROCESS_EXITHANDLER(runicast_close(&runicast);)
+  PROCESS_BEGIN();
+  runicast_open(&runicast, 144, &runicast_callbacks);
 
-    while(1) {
-        static struct etimer et;
-        linkaddr_t addr;
+  while(1) {
+    static struct etimer et;
+    linkaddr_t addr;
 
-        // Delay between 16 and 32 seconds
-        etimer_set(&et, CLOCK_SECOND * 16 + random_rand() % (CLOCK_SECOND * 16));
+    // Delay between 16 and 32 seconds
+    etimer_set(&et, CLOCK_SECOND * 16 + random_rand() % (CLOCK_SECOND * 16));
 
-        PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
-        if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
-            msg.temperature = (random_rand() % 40) - 10;
-            packetbuf_copyfrom(&msg, sizeof(struct runicast_msg));
-            addr.u8[0] = parent->addr[0];
-            addr.u8[1] = parent->addr[1];
-            runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
-        }
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+    if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
+      memset(datas, ' ', 20);
+      sprintf(datas, "%d/temperature/%d", node_id, (random_rand() % 40) - 10);
+      packetbuf_copyfrom(datas, strlen(datas));
+      addr.u8[0] = parent->addr[0];
+      addr.u8[1] = parent->addr[1];
+      runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
     }
 
+  }
     PROCESS_END();
 }
