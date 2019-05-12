@@ -25,7 +25,7 @@ def establish(device_name) :
         s = data.split(" ")
         client.publish(s[0], s[1])
 
-    client = mqtt.Client("test")
+    client = mqtt.Client("gateway")
     client.connect(BROKER_ADDRESS)
 
     sock = serial.Serial(device_name)
