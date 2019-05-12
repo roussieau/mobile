@@ -33,7 +33,9 @@ struct node {
 static struct broadcast_conn broadcast;
 static struct runicast_conn runicast;
 static struct timer lastUpdate;
+static struct timer aggregation;
 static struct node *parent;
+static char aggregate_datas[128];
 
 /*---------------------------------------------------------------------------*/
 PROCESS(broadcast_process, "Broadcast process");
@@ -110,34 +112,52 @@ PROCESS_THREAD(broadcast_process, ev, data) {
     }
   }
 
+  free(parent);
   PROCESS_END();
 }
 
 
 
 /*---------------------------RUNICAST-----------------------------------------*/
+static void runicast_send_bulk(struct runicast_conn *c) {
+  linkaddr_t addr;
+  addr.u8[0] = parent->addr[0];
+  addr.u8[1] = parent->addr[1];
+
+  size_t size = strlen(aggregate_datas);
+  if(size > 0) {
+    packetbuf_copyfrom(aggregate_datas, size);
+    while(runicast_is_transmitting(c)) {}
+    runicast_send(c, &addr, MAX_RETRANSMISSIONS);
+  }
+}
 static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
   // If root or not connected to parent, we do not forward packets
   if(parent->distToRoot < 0) return;
 
   // When receiving a runicast packet, forward it to the parent
   char *datas;
-  linkaddr_t addr;
-
   datas = packetbuf_dataptr();
-  addr.u8[0] = parent->addr[0];
-  addr.u8[1] = parent->addr[1];
+  char tmp[strlen(datas)];
+  strncpy(tmp, datas, strlen(datas));
 
-  packetbuf_copyfrom(datas, strlen(datas));
-  runicast_send(c, &addr, MAX_RETRANSMISSIONS);
+  if(timer_expired(&aggregation) || strlen(aggregate_datas) + strlen(datas) > 100) {
+    runicast_send_bulk(c);
+    timer_restart(&aggregation);
+    strncpy(aggregate_datas, "", strlen(aggregate_datas));
+  }
+
+  strcat(aggregate_datas, tmp);
 }
+static const struct runicast_callbacks test = {};
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
-  char *datas = (char *)malloc(20);
+  char datas[25];
 
   PROCESS_EXITHANDLER(runicast_close(&runicast);)
   PROCESS_BEGIN();
+  timer_set(&aggregation, CLOCK_SECOND * 120 + random_rand() % 20);
   runicast_open(&runicast, 144, &runicast_callbacks);
 
   while(1) {
@@ -149,8 +169,8 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
-      memset(datas, ' ', 20);
-      sprintf(datas, "%d/temperature/%d", node_id, (random_rand() % 40) - 10);
+      memset(datas, ' ', 25);
+      sprintf(datas, "%d/temperature:%d;", node_id, (random_rand() % 40) - 10);
       packetbuf_copyfrom(datas, strlen(datas));
       addr.u8[0] = parent->addr[0];
       addr.u8[1] = parent->addr[1];
@@ -160,3 +180,4 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
   PROCESS_END();
 }
+
