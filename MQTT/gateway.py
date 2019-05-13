@@ -28,10 +28,21 @@ def establish(device_name) :
 			sock.write(str.encode(msg))
 			sock.write(b"\n")
 
-
 	def send_to_mqtt(data) :
-		s = data.split(" ")
-		client.publish(s[0], s[1])
+		diff = data.split(" ")
+		updated = parse(diff[0])
+		client.publish(updated, diff[1])
+
+	def parse(data) :
+		arr = data.split("/")
+		last = arr[-1]
+		last = "temperature" if last == "0" else "humidity"
+		arr[-1] = last
+		parsed = ""
+		for e in arr :
+			parsed +=("/" + e)
+		return parsed
+
 
 	sock = serial.Serial(device_name)
 
