@@ -16,7 +16,7 @@ if __name__ == "__main__":
     client = mqtt.Client()
     client.connect(BROKER_ADDRESS)
     client.subscribe("3/temperature/")
-    client.subscribe("4/temperature/")
+    client.subscribe("2/temperature/")
     client.subscribe("1/temperature/")
     client.on_message = on_message
     client.loop_forever()

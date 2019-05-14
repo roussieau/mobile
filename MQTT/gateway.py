@@ -13,8 +13,11 @@ def establish(device_name) :
 		while 1 :
 			data = sock.readline()
 			data_string = data.decode("utf-8")
-			for e in data_string.split(";") :
-				send_to_mqtt(e)
+			if(data_string[0] =="!") :
+				for e in data_string.split(";") :
+					send_to_mqtt(e[1:])
+			else :
+				print(data)
 
 	def user_input() :
 		while 1 :
@@ -24,6 +27,7 @@ def establish(device_name) :
 
 	def send_to_mqtt(data) :
 		diff = data.split(":")
+		if (len(diff) != 2): return
 		updated = parse(diff[0])
 		client.publish(updated, diff[1])
 
@@ -31,10 +35,11 @@ def establish(device_name) :
 		arr = data.split("/")
 		last = arr[-1]
 		last = "temperature" if last == "0" else "humidity"
-		arr[-1] = last
+		arr = arr[:-1] 
+		arr.append(last)
 		parsed = ""
 		for e in arr :
-			parsed +=("/" + e)
+			parsed +=(e + "/")
 		return parsed
 
 	def on_message(client, userdata, message) :
