@@ -40,9 +40,9 @@ def establish(device_name) :
 	def on_message(client, userdata, message) :
 		msg = message.payload.decode("utf-8")
 		if(msg == "1") :
-			sock.write(b"power off\n")
+		    sock.write(b"power off\n")
 		else :
-			sock.write(b"power on\n")
+		    sock.write(b"power on\n")
 
 	sock = serial.Serial(device_name)
 
