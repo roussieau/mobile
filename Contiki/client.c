@@ -134,7 +134,7 @@ static void runicast_send_bulk(struct runicast_conn *c) {
 
   size_t size = strlen(aggregate_datas);
   if(size > 0) {
-    packetbuf_copyfrom(aggregate_datas, size);
+    packetbuf_copyfrom(aggregate_datas, size+1);
     while(runicast_is_transmitting(c)) {}
     runicast_send(c, &addr, MAX_RETRANSMISSIONS);
   }
@@ -147,17 +147,16 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
   char *datas;
   datas = packetbuf_dataptr();
   char tmp[strlen(datas)];
-  strncpy(tmp, datas, strlen(datas));
+  strcpy(tmp, datas);
 
   if(timer_expired(&aggregation) || strlen(aggregate_datas) + strlen(datas) > 100) {
     runicast_send_bulk(c);
     timer_restart(&aggregation);
-    strncpy(aggregate_datas, "", strlen(aggregate_datas));
+    strcpy(aggregate_datas, "");
   }
 
   strcat(aggregate_datas, tmp);
 }
-static const struct runicast_callbacks test = {};
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 
 /*---------------------------------------------------------------------------*/
@@ -180,7 +179,7 @@ PROCESS_THREAD(runicast_process, ev, data) {
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
       memset(datas, ' ', 25);
       sprintf(datas, "%d/temperature:%d;", node_id, (random_rand() % 40) - 10);
-      packetbuf_copyfrom(datas, strlen(datas));
+      packetbuf_copyfrom(datas, strlen(datas)+1);
       addr.u8[0] = parent->addr[0];
       addr.u8[1] = parent->addr[1];
       runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
