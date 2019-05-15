@@ -40,6 +40,7 @@ def establish(device_name) :
 		parsed = ""
 		for e in arr :
 			parsed +=(e + "/")
+		print(parsed)
 		return parsed
 
 	def on_message(client, userdata, message) :
