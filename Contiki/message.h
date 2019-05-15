@@ -4,9 +4,13 @@ enum {
 	BROADCAST_TYPE_SIGNALLOST,
 };
 
+enum {
+	BROADCAST_CONFIG_INSTANT,
+	BROADCAST_CONFIG_AGGREGATE,
+};
+
 struct broadcast_msg {
 	uint8_t type;
 	int16_t info;
 };
-
 

@@ -43,7 +43,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
   while(1) {
     /* Send a broadcast every 4 - 8 seconds */
     etimer_set(&et, CLOCK_SECOND * 4 + random_rand() % (CLOCK_SECOND * 4));
-    
+
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(powerOn) {
         packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
@@ -98,14 +98,21 @@ PROCESS_THREAD(main_process, ev, data)
                 packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
                 broadcast_send(&broadcast);
        }
-            else { 
+            else if(strcmp("config instant", data) == 0) {
                 msg.type = BROADCAST_TYPE_CONFIG;
-                msg.info = 1;
+                msg.info = BROADCAST_CONFIG_INSTANT;
                 packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
                 broadcast_send(&broadcast);
             }
- 
+            else if(strcmp("config aggregate", data) == 0) {
+              msg.type = BROADCAST_TYPE_CONFIG;
+              msg.info = BROADCAST_CONFIG_AGGREGATE;
+              packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+              broadcast_send(&broadcast);
+            }
+
         }
     }
     PROCESS_END();
 }
+

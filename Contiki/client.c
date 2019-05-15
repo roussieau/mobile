@@ -28,6 +28,7 @@ static struct runicast_conn runicast;
 static struct timer lastUpdate;
 static struct timer aggregation;
 static struct node *parent;
+static int16_t config;
 static char aggregate_datas[128];
 
 /*---------------------------------------------------------------------------*/
@@ -62,8 +63,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
             printf("New parent found:%d.%d dist:%d \n",
                     from->u8[0], from->u8[1], msg->info);
         }
-    }
-    else if (msg-> type == BROADCAST_TYPE_SIGNALLOST
+    } else if (msg-> type == BROADCAST_TYPE_SIGNALLOST
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // Signal to root is lost
@@ -71,14 +71,14 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
         parent->distToRoot = -1;
         packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
-    }
-    else if (msg->type == BROADCAST_TYPE_CONFIG
+    } else if (msg->type == BROADCAST_TYPE_CONFIG
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // CONFIG MESSAGE only allowed from parent IF we have one
         // CONFIG MESSAGE ==> We need to forward it downstream
-        printf("CONFIG message received from parent\n");
+        printf("CONFIG message %d received from parent\n", msg->info);
 
+        config = msg->info;
         packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
     }
@@ -92,6 +92,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
     PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
         PROCESS_BEGIN();
 
+    config = BROADCAST_CONFIG_AGGREGATE; 
     parent = (struct node*)malloc(sizeof(struct node));
     parent->distToRoot = -1;
     timer_set(&lastUpdate, CLOCK_SECOND * 40);
@@ -157,12 +158,16 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
   strcpy(tmp, packetbuf_dataptr());
   tmp[strlen(packetbuf_dataptr())] = '\0';
   append_msg(c, tmp);
+  if(config == BROADCAST_CONFIG_INSTANT) {
+    runicast_send_bulk(c);
+    strcpy(aggregate_datas, "");
+  }
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 
 /*---------------------------------------------------------------------------*/
 PROCESS_THREAD(runicast_process, ev, data) {
-  char datas[25];
+  char temperature[25], humidity[25];
 
   PROCESS_EXITHANDLER(runicast_close(&runicast);)
   PROCESS_BEGIN();
@@ -171,32 +176,25 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
   while(1) {
     static struct etimer et;
-    linkaddr_t addr;
 
     // Delay between 16 and 32 seconds
     etimer_set(&et, CLOCK_SECOND * 16 + random_rand() % (CLOCK_SECOND * 16));
 
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
-      memset(datas, ' ', 25);
-	  if(random_rand() % 2 == 0) {
-		  //Temperature
-		  sprintf(datas, "!%d/0:%d;\0", node_id, (random_rand() % 40) - 10);
-	  }
-	  else {	
-		  //Humidity
-		  sprintf(datas, "!%d/1:%d;\0", node_id, (random_rand() % 100));
-	  }
-      // For instant relay
-      // packetbuf_copyfrom(datas, strlen(datas)+1);
-      // addr.u8[0] = parent->addr[0];
-      // addr.u8[1] = parent->addr[1];
-      // runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
+      memset(temperature, ' ', 25);
+      memset(humidity, ' ', 25);
+		  sprintf(temperature, "!%d/0:%d;", node_id, (random_rand() % 40) - 10);
+      sprintf(humidity, "!%d/1:%d;", node_id, (random_rand() % 100));
 
-      // For aggregation
-      append_msg(&runicast, datas);
+      append_msg(&runicast, temperature);
+      append_msg(&runicast, humidity);
+      if(config == BROADCAST_CONFIG_INSTANT) {
+        runicast_send_bulk(&runicast);
+        strcpy(aggregate_datas, "");
+      }
+	  }
     }
-  }
 
   PROCESS_END();
 }
