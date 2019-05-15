@@ -39,7 +39,7 @@ AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
 static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
     struct broadcast_msg *msg;
     msg = packetbuf_dataptr();
-    // Discover packet 
+    // Discover packet
     if(msg->type == BROADCAST_TYPE_DISCOVER) {
         // DISCOVER MESSAGE ==> We need to construct the tree
         if(parent->distToRoot == msg->info && parent->addr[0] == from->u8[0]
@@ -63,7 +63,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
                     from->u8[0], from->u8[1], msg->info);
         }
     }
-    else if (msg-> type == BROADCAST_TYPE_SIGNALLOST 
+    else if (msg-> type == BROADCAST_TYPE_SIGNALLOST
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // Signal to root is lost
@@ -72,7 +72,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
         packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
     }
-    else if (msg->type == BROADCAST_TYPE_CONFIG 
+    else if (msg->type == BROADCAST_TYPE_CONFIG
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // CONFIG MESSAGE only allowed from parent IF we have one
@@ -108,7 +108,7 @@ PROCESS_THREAD(broadcast_process, ev, data) {
             printf("Timer expired\n");
             // We warn the neighbors that we have lost the signal to root
             msg.type = BROADCAST_TYPE_SIGNALLOST;
-            packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));  
+            packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
             broadcast_send(&broadcast);
         }
         else if(parent->distToRoot > 0) {
@@ -139,23 +139,24 @@ static void runicast_send_bulk(struct runicast_conn *c) {
     runicast_send(c, &addr, MAX_RETRANSMISSIONS);
   }
 }
-static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
-    // If root or not connected to parent, we do not forward packets
-    if(parent->distToRoot < 0) return;
-
-  // When receiving a runicast packet, forward it to the parent
-  char *datas;
-  datas = packetbuf_dataptr();
-  char tmp[strlen(datas)];
-  strcpy(tmp, datas);
-
+static void append_msg(struct runicast_conn *c, char *datas) {
   if(timer_expired(&aggregation) || strlen(aggregate_datas) + strlen(datas) > 100) {
     runicast_send_bulk(c);
     timer_restart(&aggregation);
     strcpy(aggregate_datas, "");
   }
 
-  strcat(aggregate_datas, tmp);
+  strcat(aggregate_datas, datas);
+}
+static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8_t seqno) {
+    // If root or not connected to parent, we do not forward packets
+    if(parent->distToRoot < 0) return;
+
+  // When receiving a runicast packet, forward it to the parent
+  char tmp[strlen(packetbuf_dataptr())+1];
+  strcpy(tmp, packetbuf_dataptr());
+  tmp[strlen(packetbuf_dataptr())] = '\0';
+  append_msg(c, tmp);
 }
 static const struct runicast_callbacks runicast_callbacks = {runicast_recv};
 
@@ -178,14 +179,18 @@ PROCESS_THREAD(runicast_process, ev, data) {
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
       memset(datas, ' ', 25);
-      sprintf(datas, "%d/temperature:%d;", node_id, (random_rand() % 40) - 10);
-      packetbuf_copyfrom(datas, strlen(datas)+1);
-      addr.u8[0] = parent->addr[0];
-      addr.u8[1] = parent->addr[1];
-      runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
-    }
+      sprintf(datas, "%d/temperature:%d;\0", node_id, (random_rand() % 40) - 10);
+      // For instant relay
+      // packetbuf_copyfrom(datas, strlen(datas)+1);
+      // addr.u8[0] = parent->addr[0];
+      // addr.u8[1] = parent->addr[1];
+      // runicast_send(&runicast, &addr, MAX_RETRANSMISSIONS);
 
+      // For aggregation
+      append_msg(&runicast, datas);
+    }
   }
-    PROCESS_END();
+
+  PROCESS_END();
 }
 
