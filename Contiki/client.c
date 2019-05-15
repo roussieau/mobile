@@ -179,7 +179,14 @@ PROCESS_THREAD(runicast_process, ev, data) {
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
       memset(datas, ' ', 25);
-      sprintf(datas, "%d/temperature:%d;\0", node_id, (random_rand() % 40) - 10);
+	  if(random_rand() % 2 == 0) {
+		  //Temperature
+		  sprintf(datas, "!%d/0:%d;\0", node_id, (random_rand() % 40) - 10);
+	  }
+	  else {	
+		  //Humidity
+		  sprintf(datas, "!%d/1:%d;\0", node_id, (random_rand() % 100));
+	  }
       // For instant relay
       // packetbuf_copyfrom(datas, strlen(datas)+1);
       // addr.u8[0] = parent->addr[0];
