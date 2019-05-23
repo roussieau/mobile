@@ -1,18 +1,3 @@
-00:02.893	ID:2	Rime started with address 2.0
-00:02.908	ID:2	MAC 02:00:00:00:00:00:00:00 Contiki-2.6-2450-geaa8760 started. Node id is set to 2.
-00:02.919	ID:2	CSMA ContikiMAC, channel check rate 8 Hz, radio channel 26
-00:02.926	ID:2	Starting 'Broadcast process' 'Runicast process'
-00:03.005	ID:4	Rime started with address 4.0
-00:03.020	ID:4	MAC 04:00:00:00:00:00:00:00 Contiki-2.6-2450-geaa8760 started. Node id is set to 4.
-00:03.031	ID:4	CSMA ContikiMAC, channel check rate 8 Hz, radio channel 26
-00:03.038	ID:1	Rime started with address 1.0
-00:03.038	ID:4	Starting 'Broadcast process' 'Runicast process'
-00:03.053	ID:1	MAC 01:00:00:00:00:00:00:00 Contiki-2.6-2450-geaa8760 started. Node id is set to 1.
-00:03.064	ID:1	CSMA ContikiMAC, channel check rate 8 Hz, radio channel 26
-00:03.073	ID:1	Starting 'Broadcast process' 'Runicast process' 'main process'
-00:03.556	ID:3	Rime started with address 3.0
-00:03.571	ID:3	MAC 03:00:00:00:00:00:00:00 Contiki-2.6-2450-geaa8760 started. Node id is set to 3.
-00:03.582	ID:3	CSMA ContikiMAC, channel check rate 8 Hz, radio channel 26
 00:03.589	ID:3	Starting 'Broadcast process' 'Runicast process'
 00:12.950	ID:2	 742 P 2.0 0 139 163704 0 469 0 469 139 163704 0 469 0 469 (radio 0.28% / 0.28% tx 0.00% / 0.00% listen 0.28% / 0.28%)
 00:13.062	ID:4	 742 P 4.0 0 139 163704 0 469 0 469 139 163704 0 469 0 469 (radio 0.28% / 0.28% tx 0.00% / 0.00% listen 0.28% / 0.28%)
