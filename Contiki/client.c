@@ -5,6 +5,8 @@
 #include "lib/random.h"
 #include "net/rime/rime.h"
 #include "sys/timer.h"
+#include "sys/clock.h"
+#include "powertrace.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,7 +71,7 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
         // Signal to root is lost
         printf("Lost signal received !\n");
         parent->distToRoot = -1;
-        packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
+	packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
     } else if (msg->type == BROADCAST_TYPE_CONFIG
             && from->u8[0] == parent->addr[0]
@@ -90,7 +92,8 @@ PROCESS_THREAD(broadcast_process, ev, data) {
     struct broadcast_msg msg;
 
     PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
-        PROCESS_BEGIN();
+    PROCESS_BEGIN();
+    powertrace_start(CLOCK_SECOND*5);
 
     config = BROADCAST_CONFIG_AGGREGATE; 
     parent = (struct node*)malloc(sizeof(struct node));
@@ -171,6 +174,7 @@ PROCESS_THREAD(runicast_process, ev, data) {
 
   PROCESS_EXITHANDLER(runicast_close(&runicast);)
   PROCESS_BEGIN();
+  powertrace_start(CLOCK_SECOND*5);
   timer_set(&aggregation, CLOCK_SECOND * 120 + random_rand() % 20);
   runicast_open(&runicast, 144, &runicast_callbacks);
 
