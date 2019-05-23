@@ -139,7 +139,6 @@ static void runicast_send_bulk(struct runicast_conn *c) {
   size_t size = strlen(aggregate_datas);
   if(size > 0) {
     packetbuf_copyfrom(aggregate_datas, size+1);
-    while(runicast_is_transmitting(c)) {}
     runicast_send(c, &addr, MAX_RETRANSMISSIONS);
   }
 }
@@ -163,6 +162,7 @@ static void runicast_recv(struct runicast_conn *c, const linkaddr_t *from, uint8
   append_msg(c, tmp);
   if(config == BROADCAST_CONFIG_INSTANT) {
     runicast_send_bulk(c);
+    //printf("Sending: %s(%d) to %d.%d\n", (char *)packetbuf_dataptr(), seqno, parent->addr[0], parent->addr[1]);
     strcpy(aggregate_datas, "");
   }
 }
