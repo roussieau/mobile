@@ -64,7 +64,7 @@ A possible example looks like this : \\
 \centerline{\textit{4/0:-17}}
 \end{center}
 This message has been sent by a sensor identified by the id 4 concerning the temperature with a value of -17 degree Celsius. We decided to make a matching between the real name of the topic and an integer in order to minimize the amount of data sent in the sensor network. The gateway is responsible for making the translation between this notation and the explicit topic name on which the MQTT clients have subscribed. \\
-JULIAN EXPLIQUE ICI LA DIFF ENTRE ON-CHANGE ET INSTANTANEAOUS POUR L'ENVOI DE DONNES
+We have two different types of send. They are both dependent on the same timer, when this one expires the data is sent if the mote is in periodic mode. On the other hand if the mote is in mode onChange, the data will be sent only if they have changed since the last sending.
 \\
 \textit{N.B.: For experimentation, we have created only two different topics (temperature and humidity). Each node can send both with a randomly generated value in the interval \textbf{[-10;39[} for temperature and \textbf{[0;100[} for humidity.}
 
