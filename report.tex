@@ -86,6 +86,10 @@ If the aggregation option is activated, each time a node receive something from 
 
 \section{Measurements}
 
+In order to see the performance and stability of our implementation, we made some measurements for different network configurations using PowerTrace. For each, we measured the mean CPU utilization and power consumption in Lower Power (LPM), Transmit (TX) and Receive (RX) states of the sensor nodes. \\
+As it can be seen on figure \ref{g1} in annexes, when the aggregation option is set, the number of nodes in our network doesn't have any real impact. Indeed, all the metrics stay the same. This is quite logical since the nodes are only sending the aggregates on a regular basis. Therefore, their power consumption is reduced.\\
+On the other hand, when looking at figure \ref{g2} corresponding to default mode, it can clearly be seen that the average consumptions are increasing with the size of the network. This can be explained by the fact that all nodes are sending together whenever they want and don't care about synchronization.\\
+Last thing to notice is that, even for a small number of nodes, the average power consumption is clearly higher in default mode, justified by the number of simultaneous communications. For a 10 nodes network, the power consumption in the first case is around 1 mW and more than the double in the second case.
 \section{Annexes}
 
 \begin{center}
