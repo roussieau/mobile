@@ -97,8 +97,20 @@ PROCESS_THREAD(main_process, ev, data)
 				msg.type = BROADCAST_TYPE_SIGNALLOST;
                 packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
                 broadcast_send(&broadcast);
-       }
-            else if(strcmp("config instant", data) == 0) {
+			}
+            else if(strcmp("mode periodic", data) == 0) {
+                msg.type = BROADCAST_TYPE_CONFIG;
+                msg.info = BROADCAST_CONFIG_PERIODIC;
+                packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+                broadcast_send(&broadcast);
+            }
+			else if(strcmp("mode onChange", data) == 0) {
+                msg.type = BROADCAST_TYPE_CONFIG;
+                msg.info = BROADCAST_CONFIG_ONCHANGE;
+                packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));
+                broadcast_send(&broadcast);
+            }
+			else if(strcmp("config instant", data) == 0) {
                 msg.type = BROADCAST_TYPE_CONFIG;
                 msg.info = BROADCAST_CONFIG_INSTANT;
                 packetbuf_copyfrom(&msg, sizeof(struct broadcast_msg));

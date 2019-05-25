@@ -24,6 +24,10 @@ struct node {
     uint8_t addr[2];
 };
 
+struct data {
+	int humidity;
+	int temperature;
+};
 
 static struct broadcast_conn broadcast;
 static struct runicast_conn runicast;
@@ -31,12 +35,16 @@ static struct timer lastUpdate;
 static struct timer aggregation;
 static struct node *parent;
 static int16_t config;
+static int mode = 1;
 static char aggregate_datas[128];
+static struct data newValue = {0, 0}; 
+static struct data oldValue = {0, 0}; 
 
 /*---------------------------------------------------------------------------*/
 PROCESS(broadcast_process, "Broadcast process");
 PROCESS(runicast_process, "Runicast process");
-AUTOSTART_PROCESSES(&broadcast_process, &runicast_process);
+PROCESS(gen_process, "Generate process");
+AUTOSTART_PROCESSES(&broadcast_process, &runicast_process, &gen_process);
 
 /*---------------------------------------------------------------------------*/
 static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
@@ -65,22 +73,29 @@ static void broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from) {
             printf("New parent found:%d.%d dist:%d \n",
                     from->u8[0], from->u8[1], msg->info);
         }
-    } else if (msg-> type == BROADCAST_TYPE_SIGNALLOST
+    } 
+	else if (msg-> type == BROADCAST_TYPE_SIGNALLOST
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // Signal to root is lost
         printf("Lost signal received !\n");
         parent->distToRoot = -1;
-	packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
+		packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
-    } else if (msg->type == BROADCAST_TYPE_CONFIG
+    } 
+	else if (msg->type == BROADCAST_TYPE_CONFIG
             && from->u8[0] == parent->addr[0]
             && from->u8[1] == parent->addr[1]) {
         // CONFIG MESSAGE only allowed from parent IF we have one
         // CONFIG MESSAGE ==> We need to forward it downstream
         printf("CONFIG message %d received from parent\n", msg->info);
-
-        config = msg->info;
+		if (msg->info == BROADCAST_CONFIG_AGGREGATE 
+			|| msg->info == BROADCAST_CONFIG_INSTANT) {
+			config = msg->info;
+		}
+		else {
+			mode = msg->info;
+		}
         packetbuf_copyfrom(msg, sizeof(struct broadcast_msg));
         broadcast_send(&broadcast);
     }
@@ -181,25 +196,47 @@ PROCESS_THREAD(runicast_process, ev, data) {
   while(1) {
     static struct etimer et;
 
-    // Delay between 16 and 32 seconds
-    etimer_set(&et, CLOCK_SECOND * 16 + random_rand() % (CLOCK_SECOND * 16));
+    etimer_set(&et, CLOCK_SECOND * 10);
 
     PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
     if(parent->distToRoot > 0 && !runicast_is_transmitting(&runicast)) {
-      memset(temperature, ' ', 25);
-      memset(humidity, ' ', 25);
-		  sprintf(temperature, "!%d/0:%d;", node_id, (random_rand() % 40) - 10);
-      sprintf(humidity, "!%d/1:%d;", node_id, (random_rand() % 100));
-
+	  if( mode == BROADCAST_CONFIG_PERIODIC
+	    || oldValue.temperature != newValue.temperature 
+	    || oldValue.humidity != oldValue.humidity) {
+		  memset(temperature, ' ', 25);
+		  memset(humidity, ' ', 25);
+		  sprintf(temperature, "!%d/0:%d;", node_id, newValue.temperature);
+		  sprintf(humidity, "!%d/1:%d;", node_id, newValue.humidity);
+      }
+	  oldValue = newValue;
       append_msg(&runicast, temperature);
       append_msg(&runicast, humidity);
       if(config == BROADCAST_CONFIG_INSTANT) {
         runicast_send_bulk(&runicast);
         strcpy(aggregate_datas, "");
       }
-	  }
-    }
+	}
+  }
 
   PROCESS_END();
 }
 
+// Random data generation
+PROCESS_THREAD(gen_process, ev, data) {
+
+  PROCESS_EXITHANDLER(runicast_close(&runicast);)
+  PROCESS_BEGIN();
+
+  while(1) {
+    static struct etimer et;
+
+    // Delay between 100 and 120 seconds
+    etimer_set(&et, CLOCK_SECOND * 100 + random_rand() % (CLOCK_SECOND * 20));
+
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+	newValue.temperature = (random_rand() % 40) - 10;
+	newValue.humidity = (random_rand() % 100);
+  }
+
+  PROCESS_END();
+}
