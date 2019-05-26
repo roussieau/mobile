@@ -16,8 +16,6 @@ def establish(device_name) :
 			if(data_string[0] =="!") :
 				for e in data_string.split(";") :
 					send_to_mqtt(e[1:])
-			else :
-				print(data)
 
 	def user_input() :
 		while 1 :
@@ -40,7 +38,6 @@ def establish(device_name) :
 		parsed = ""
 		for e in arr :
 			parsed +=(e + "/")
-		print(parsed)
 		return parsed
 
 	def on_message(client, userdata, message) :
